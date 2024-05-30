@@ -1,8 +1,7 @@
 import { AugmentationName, FactionName, FactionDiscovery } from "@enums";
 import { FactionInfo, FactionInfos } from "./FactionInfo";
-import { favorToRep, repToFavor } from "./formulas/favor";
-import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
-import { getKeyList } from "../utils/helpers/getKeyList";
+import { MaxFavor, calculateFavorAfterResetting } from "./formulas/favor";
+import { clampNumber } from "../utils/helpers/clampNumber";
 
 export class Faction {
   /**
@@ -15,7 +14,7 @@ export class Faction {
   augmentations: AugmentationName[] = [];
 
   /** Amount of favor the player has with this faction. */
-  favor = 0;
+  #favor = 0;
 
   /** Flag signalling whether player has been banned from this faction */
   isBanned = false;
@@ -32,8 +31,27 @@ export class Faction {
   /** Amount of reputation player has with this faction */
   playerReputation = 0;
 
-  constructor(name = FactionName.Sector12) {
+  constructor(name: FactionName) {
     this.name = name;
+  }
+
+  get favor() {
+    return this.#favor;
+  }
+
+  /**
+   * There is no setter for this.#favor. This is intentional. Performing arithmetic operations on `favor` may lead to
+   * the overflow error of `playerReputation`, so anything that wants to change `favor` must explicitly do that through
+   * `setFavor`.
+   *
+   * @param value
+   */
+  setFavor(value: number) {
+    if (Number.isNaN(value)) {
+      this.#favor = 0;
+      return;
+    }
+    this.#favor = clampNumber(value, 0, MaxFavor);
   }
 
   getInfo(): FactionInfo {
@@ -49,7 +67,7 @@ export class Faction {
 
   prestigeSourceFile() {
     // Reset favor, reputation, and flags
-    this.favor = 0;
+    this.setFavor(0);
     this.playerReputation = 0;
     this.alreadyInvited = false;
     this.isMember = false;
@@ -58,39 +76,11 @@ export class Faction {
 
   prestigeAugmentation(): void {
     // Gain favor
-    if (this.favor == null) this.favor = 0;
-    this.favor += this.getFavorGain();
+    this.setFavor(calculateFavorAfterResetting(this.favor, this.playerReputation));
     // Reset reputation and flags
     this.playerReputation = 0;
     this.alreadyInvited = false;
     this.isMember = false;
     this.isBanned = false;
   }
-
-  //Returns an array with [How much favor would be gained, how much rep would be left over]
-  getFavorGain(): number {
-    if (this.favor == null) {
-      this.favor = 0;
-    }
-    const storedRep = Math.max(0, favorToRep(this.favor));
-    const totalRep = storedRep + this.playerReputation;
-    const newFavor = repToFavor(totalRep);
-    return newFavor - this.favor;
-  }
-
-  static savedKeys = getKeyList(Faction, {
-    removedKeys: ["augmentations", "name", "alreadyInvited", "isBanned", "isMember"],
-  });
-
-  /** Serialize the current object to a JSON save state. */
-  toJSON(): IReviverValue {
-    return Generic_toJSON("Faction", this, Faction.savedKeys);
-  }
-
-  /** Initializes a Faction object from a JSON save state. */
-  static fromJSON(value: IReviverValue): Faction {
-    return Generic_fromJSON(Faction, value.data, Faction.savedKeys);
-  }
 }
-
-constructorsForReviver.Faction = Faction;

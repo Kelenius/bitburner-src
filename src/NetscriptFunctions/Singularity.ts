@@ -3,7 +3,6 @@ import type { Singularity as ISingularity, Task as ITask } from "@nsdefs";
 import { Player } from "@player";
 import {
   AugmentationName,
-  BlackOperationName,
   CityName,
   FactionName,
   FactionWorkType,
@@ -57,6 +56,9 @@ import { root } from "../Paths/Directory";
 import { getRecordEntries } from "../Types/Record";
 import { JobTracks } from "../Company/data/JobTracks";
 import { ServerConstants } from "../Server/data/Constants";
+import { blackOpsArray } from "../Bladeburner/data/BlackOperations";
+import { calculateEffectiveRequiredReputation } from "../Company/utils";
+import { calculateFavorAfterResetting } from "../Faction/formulas/favor";
 
 export function NetscriptSingularity(): InternalAPI<ISingularity> {
   const runAfterReset = function (cbScript: ScriptFilePath) {
@@ -691,7 +693,7 @@ export function NetscriptSingularity(): InternalAPI<ISingularity> {
         field: job.field,
         nextPosition: job.nextPosition,
         salary: job.baseSalary * company.salaryMultiplier,
-        requiredReputation: job.requiredReputation,
+        requiredReputation: calculateEffectiveRequiredReputation(companyName, job.requiredReputation),
         requiredSkills: job.requiredSkills(company.jobStatReqOffset),
       };
       return res;
@@ -760,13 +762,20 @@ export function NetscriptSingularity(): InternalAPI<ISingularity> {
     getCompanyFavorGain: (ctx) => (_companyName) => {
       helpers.checkSingularityAccess(ctx);
       const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
-      return Companies[companyName].getFavorGain();
+      const company = Companies[companyName];
+      return calculateFavorAfterResetting(company.favor, company.playerReputation) - company.favor;
     },
     getFactionInviteRequirements: (ctx) => (_facName) => {
       helpers.checkSingularityAccess(ctx);
       const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
       const fac = Factions[facName];
       return [...fac.getInfo().inviteReqs].map((condition) => condition.toJSON());
+    },
+    getFactionEnemies: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const fac = Factions[facName];
+      return fac.getInfo().enemies.slice();
     },
     checkFactionInvitations: (ctx) => () => {
       helpers.checkSingularityAccess(ctx);
@@ -904,7 +913,7 @@ export function NetscriptSingularity(): InternalAPI<ISingularity> {
       helpers.checkSingularityAccess(ctx);
       const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
       const faction = Factions[facName];
-      return faction.getFavorGain();
+      return calculateFavorAfterResetting(faction.favor, faction.playerReputation) - faction.favor;
     },
     donateToFaction: (ctx) => (_facName, _amt) => {
       helpers.checkSingularityAccess(ctx);
@@ -1105,7 +1114,7 @@ export function NetscriptSingularity(): InternalAPI<ISingularity> {
     destroyW0r1dD43m0n: (ctx) => (_nextBN, _cbScript) => {
       helpers.checkSingularityAccess(ctx);
       const nextBN = helpers.number(ctx, "nextBN", _nextBN);
-      if (nextBN > 13 || nextBN < 1 || !Number.isInteger(nextBN)) {
+      if (nextBN > 14 || nextBN < 1 || !Number.isInteger(nextBN)) {
         throw new Error(`Invalid bitnode specified: ${_nextBN}`);
       }
       const cbScript = _cbScript
@@ -1122,7 +1131,7 @@ export function NetscriptSingularity(): InternalAPI<ISingularity> {
       };
       const bladeburnerRequirements = () => {
         if (!Player.bladeburner) return false;
-        return Player.bladeburner.blackops[BlackOperationName.OperationDaedalus];
+        return Player.bladeburner.numBlackOpsComplete >= blackOpsArray.length;
       };
 
       if (!hackingRequirements() && !bladeburnerRequirements()) {

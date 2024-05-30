@@ -1,5 +1,4 @@
 import { Settings } from "../Settings/Settings";
-import { isString } from "./helpers/string";
 
 /*
 Converts a date representing time in milliseconds to a string with the format H hours M minutes and S seconds
@@ -60,22 +59,21 @@ function longestCommonStart(strings: string[]): string {
     return "";
   }
 
-  const A: string[] = strings.concat().sort();
-  const a1: string = A[0];
-  const a2: string = A[A.length - 1];
-  const L: number = a1.length;
-  let i = 0;
-  const areEqualCaseInsensitive = (a: string, b: string) => a.toUpperCase() === b.toUpperCase();
-  while (i < L && areEqualCaseInsensitive(a1.charAt(i), a2.charAt(i))) {
-    i++;
+  const a1: string = strings[0];
+  for (let i = 0; i < a1.length; ++i) {
+    const chr = a1.charAt(i).toUpperCase();
+    for (let s = 1; s < strings.length; ++s) {
+      if (chr !== strings[s].charAt(i).toUpperCase()) {
+        return a1.substring(0, i);
+      }
+    }
   }
-
-  return a1.substring(0, i);
+  return a1;
 }
 
 // Returns whether an array contains entirely of string objects
 function containsAllStrings(arr: string[]): boolean {
-  return arr.every(isString);
+  return arr.every((value) => typeof value === "string");
 }
 
 // Generates a random alphanumeric string with N characters

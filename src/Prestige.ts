@@ -1,4 +1,5 @@
 import { AugmentationName, CityName, CompletedProgramName, FactionName, LiteratureName, CompanyName } from "@enums";
+import { Augmentations } from "./Augmentation/Augmentations";
 import { initBitNodeMultipliers } from "./BitNode/BitNode";
 import { Companies } from "./Company/Companies";
 import { resetIndustryResearchTrees } from "./Corporation/data/IndustryData";
@@ -25,10 +26,23 @@ import { CONSTANTS } from "./Constants";
 import { LogBoxClearEvents } from "./ui/React/LogBoxManager";
 import { initCircadianModulator } from "./Augmentation/Augmentations";
 import { Go } from "./Go/Go";
+import { calculateExp } from "./PersonObjects/formulas/skill";
+import { currentNodeMults } from "./BitNode/BitNodeMultipliers";
 
 const BitNode8StartingMoney = 250e6;
 function delayedDialog(message: string) {
   setTimeout(() => dialogBoxCreate(message), 200);
+}
+
+function setInitialExpForPlayer() {
+  Player.exp.hacking = calculateExp(1, Player.mults.hacking * currentNodeMults.HackingLevelMultiplier);
+  Player.exp.strength = calculateExp(1, Player.mults.strength * currentNodeMults.StrengthLevelMultiplier);
+  Player.exp.defense = calculateExp(1, Player.mults.defense * currentNodeMults.DefenseLevelMultiplier);
+  Player.exp.dexterity = calculateExp(1, Player.mults.dexterity * currentNodeMults.DexterityLevelMultiplier);
+  Player.exp.agility = calculateExp(1, Player.mults.agility * currentNodeMults.AgilityLevelMultiplier);
+  Player.exp.charisma = calculateExp(1, Player.mults.charisma * currentNodeMults.CharismaLevelMultiplier);
+  Player.updateSkillLevels();
+  Player.hp.current = Player.hp.max;
 }
 
 // Prestige by purchasing augmentation
@@ -60,19 +74,14 @@ export function prestigeAugmentation(): void {
   AddToAllServers(homeComp);
   prestigeHomeComputer(homeComp);
 
-  if (Player.hasAugmentation(AugmentationName.Neurolink, true)) {
-    homeComp.programs.push(CompletedProgramName.ftpCrack);
-    homeComp.programs.push(CompletedProgramName.relaySmtp);
+  // Receive starting money and programs from installed augmentations
+  for (const ownedAug of Player.augmentations) {
+    const aug = Augmentations[ownedAug.name];
+    Player.gainMoney(aug.startingMoney, "other");
+    for (const program of aug.programs) {
+      homeComp.programs.push(program);
+    }
   }
-  if (Player.hasAugmentation(AugmentationName.CashRoot, true)) {
-    Player.setMoney(1e6);
-    homeComp.programs.push(CompletedProgramName.bruteSsh);
-  }
-  if (Player.hasAugmentation(AugmentationName.PCMatrix, true)) {
-    homeComp.programs.push(CompletedProgramName.deepScan1);
-    homeComp.programs.push(CompletedProgramName.autoLink);
-  }
-
   if (Player.sourceFileLvl(5) > 0 || Player.bitNodeN === 5) {
     homeComp.programs.push(CompletedProgramName.formulas);
   }
@@ -100,7 +109,6 @@ export function prestigeAugmentation(): void {
   }
   Player.reapplyAllAugmentations();
   Player.reapplyAllSourceFiles();
-  Player.hp.current = Player.hp.max;
 
   staneksGift.prestigeAugmentation();
 
@@ -131,7 +139,7 @@ export function prestigeAugmentation(): void {
 
   // Cancel Bladeburner action
   if (Player.bladeburner) {
-    Player.bladeburner.prestige();
+    Player.bladeburner.prestigeAugmentation();
   }
 
   // BitNode 8: Ghost of Wall Street
@@ -173,6 +181,8 @@ export function prestigeAugmentation(): void {
   resetPidCounter();
   ProgramsSeen.clear();
   InvitationsSeen.clear();
+
+  setInitialExpForPlayer();
 }
 
 // Prestige by destroying Bit Node and gaining a Source File
@@ -314,4 +324,6 @@ export function prestigeSourceFile(isFlume: boolean): void {
   // Clear recent scripts
   recentScripts.splice(0, recentScripts.length);
   resetPidCounter();
+
+  setInitialExpForPlayer();
 }

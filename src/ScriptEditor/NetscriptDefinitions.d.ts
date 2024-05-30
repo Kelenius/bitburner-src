@@ -47,7 +47,7 @@ interface Player extends Person {
   jobs: Partial<Record<CompanyName, JobName>>;
   factions: string[];
   totalPlaytime: number;
-  location: string;
+  location: LocationName;
   karma: number;
 }
 
@@ -211,7 +211,7 @@ interface ReactElement {
 /** @public */
 interface RunningScript {
   /** Arguments the script was called with */
-  args: (string | number | boolean)[];
+  args: ScriptArg[];
   /** Filename of the script */
   filename: string;
   /**
@@ -435,7 +435,7 @@ interface ProcessInfo {
   /** Number of threads script is running with */
   threads: number;
   /** Script's arguments */
-  args: (string | number | boolean)[];
+  args: ScriptArg[];
   /** Process ID */
   pid: number;
   /** Whether this process is excluded from saves */
@@ -1037,7 +1037,12 @@ type SleeveFactionTask = {
 };
 
 /** @public */
-type SleeveInfiltrateTask = { type: "INFILTRATE"; cyclesWorked: number; cyclesNeeded: number };
+type SleeveInfiltrateTask = {
+  type: "INFILTRATE";
+  cyclesWorked: number;
+  cyclesNeeded: number;
+  nextCompletion: Promise<void>;
+};
 
 /** @public */
 type SleeveRecoveryTask = { type: "RECOVERY" };
@@ -1060,9 +1065,6 @@ export type SleeveTask =
   | SleeveRecoveryTask
   | SleeveSupportTask
   | SleeveSynchroTask;
-
-/** @public */
-type GoOpponent = "Netburners" | "Slum Snakes" | "The Black Hand" | "Tetrads" | "Daedalus" | "Illuminati";
 
 /** Object representing a port. A port is a serialized queue.
  * @public */
@@ -1450,7 +1452,7 @@ export interface TIX {
    * The object's properties are each an array of {@link StockOrderObject}
    * The object has the following structure:
    *
-   * ```ts
+   * ```js
    * {
    *  string1: [ // Array of orders for this stock
    *      {
@@ -1475,7 +1477,7 @@ export interface TIX {
    * Note that the order book will only contain information for stocks that you actually have orders in.
    *
    * @example
-   * ```ts
+   * ```js
    * "If you do not have orders in Nova Medical (NVMD), then the returned object will not have a “NVMD” property."
    * {
    *  ECP: [
@@ -1612,7 +1614,7 @@ export interface StudyTask {
   type: "CLASS";
   cyclesWorked: number;
   classType: string;
-  location: string;
+  location: LocationName | `${LocationName}`;
 }
 /**
  * Company Work
@@ -1798,9 +1800,9 @@ export interface Singularity {
    *
    * @example
    * ```js
-   * const programName = "BruteSSH.exe"
-   * const success = ns.purchaseProgram(programName);
-   * if (!success) ns.tprint("ERROR: Failed to purchase ${programName}")
+   * const programName = "BruteSSH.exe";
+   * const success = ns.singularity.purchaseProgram(programName);
+   * if (!success) ns.tprint(`ERROR: Failed to purchase ${programName}`);
    * ```
    * @param programName - Name of program to purchase.
    * @returns True if the specified program is purchased, and false otherwise.
@@ -2054,7 +2056,8 @@ export interface Singularity {
    *
    * @example
    * ```js
-   * ns.singularity.getFactionInviteRequirements("The Syndicate")
+   * ns.singularity.getFactionInviteRequirements("The Syndicate");
+   *
    * [
    *   { "type": "someCondition", "conditions": [
    *       { "type": "city", "city": "Aevum" },
@@ -2071,12 +2074,29 @@ export interface Singularity {
    *   },
    *   { "type": "money", "money": 10000000 },
    *   { "type": "skills", "skills": { "hacking": 200 } },
-   *   { "type": "skills", "skills": { "strength": 200, "defense": 200, "dexterity": 200, "agility": 200 } },
+   *   { "type": "skills", "skills": { "strength": 200 } },
+   *   { "type": "skills", "skills": { "defense": 200 } },
+   *   { "type": "skills", "skills": { "dexterity": 200 } },
+   *   { "type": "skills", "skills": { "agility": 200 } },
    *   { "type": "karma", "karma": -90 }
    * ]
    * ```
    */
   getFactionInviteRequirements(faction: string): PlayerRequirement[];
+
+  /**
+   * Get a list of enemies of a faction.
+   * @remarks
+   * RAM cost: 3 GB * 16/4/1
+   *
+   *
+   * Returns an array containing the names (as strings) of all factions
+   * that are enemies of the specified faction.
+   *
+   * @param faction - Name of faction.
+   * @returns Array containing the names of all enemies of the faction.
+   */
+  getFactionEnemies(faction: string): string[];
 
   /**
    * List all current faction invitations.
@@ -2123,7 +2143,7 @@ export interface Singularity {
    * const workType = "hacking";
    *
    * let success = ns.singularity.workForFaction(factionName, workType);
-   * if (!success) ns.tprint(`ERROR: Failed to start work for ${factionName} with work type ${workType}.`)
+   * if (!success) ns.tprint(`ERROR: Failed to start work for ${factionName} with work type ${workType}.`);
    * ```
    * @param faction - Name of faction to work for.
    * @param workType - Type of work to perform for the faction.
@@ -2202,22 +2222,22 @@ export interface Singularity {
    * This function returns true if you successfully start working on the specified program, and false otherwise.
    *
    * Note that creating a program using this function has the same hacking level requirements as it normally would.
-   * These level requirements are:
-   * * BruteSSH.exe: 50
-   * * FTPCrack.exe: 100
-   * * relaySMTP.exe: 250
-   * * HTTPWorm.exe: 500
-   * * SQLInject.exe: 750
-   * * DeepscanV1.exe: 75
-   * * DeepscanV2.exe: 400
-   * * ServerProfiler.exe: 75
-   * * AutoLink.exe: 25
+   * These level requirements are:<br/>
+   * - BruteSSH.exe: 50<br/>
+   * - FTPCrack.exe: 100<br/>
+   * - relaySMTP.exe: 250<br/>
+   * - HTTPWorm.exe: 500<br/>
+   * - SQLInject.exe: 750<br/>
+   * - DeepscanV1.exe: 75<br/>
+   * - DeepscanV2.exe: 400<br/>
+   * - ServerProfiler.exe: 75<br/>
+   * - AutoLink.exe: 25
    *
    * @example
    * ```js
    * const programName = "BruteSSH.exe";
-   * const success = ns.createProgram(programName);
-   * if (!success) ns.tprint("ERROR: Failed to start working on ${programName}")
+   * const success = ns.singularity.createProgram(programName);
+   * if (!success) ns.tprint(`ERROR: Failed to start working on ${programName}`);
    * ```
    * @param program - Name of program to create.
    * @param focus - Acquire player focus on this program creation. Optional. Defaults to true.
@@ -2447,7 +2467,7 @@ export interface Singularity {
    * @param locationName - Name of the location.
    * @returns True if the player was moved there, false otherwise.
    */
-  goToLocation(locationName: string): boolean;
+  goToLocation(locationName: LocationName | `${LocationName}`): boolean;
 
   /**
    * Get the current server.
@@ -2523,8 +2543,8 @@ export interface Singularity {
    *
    * @example
    * ```js
-   * const programs = ns.getDarkwebPrograms();
-   * ns.tprint(`Available programs are: ${programs.split(", ")}`);
+   * const programs = ns.singularity.getDarkwebPrograms();
+   * ns.tprint(`Available programs are: ${programs}`);
    * ```
    * @returns - a list of programs available for purchase on the dark web, or [] if Tor has not
    * been purchased
@@ -2550,8 +2570,8 @@ export interface Singularity {
    * @example
    * ```js
    * const programName = "BruteSSH.exe";
-   * const cost = ns.getDarkwebProgramCost(programName);
-   * if (cost > 0) ns.tprint(`${programName} costs ${ns.formatMoney(cost)}`);
+   * const cost = ns.singularity.getDarkwebProgramCost(programName);
+   * if (cost > 0) ns.tprint(`${programName} costs $${ns.formatNumber(cost)}`);
    * ```
    * @param programName - Name of program to check the price of
    * @returns Price of the specified darkweb program
@@ -3057,12 +3077,9 @@ export interface Bladeburner {
    * @remarks
    * RAM cost: 1 GB
    *
-   * Returns an object that represents the player’s current Bladeburner action.
-   * If the player is not performing an action, the function will return an object with the ‘type’ property set to “Idle”.
-   *
-   * @returns Object that represents the player’s current Bladeburner action.
+   * @returns Object that represents the player’s current Bladeburner action, or null if no action is being performed.
    */
-  getCurrentAction(): BladeburnerCurAction;
+  getCurrentAction(): BladeburnerCurAction | null;
 
   /**
    * Get the time to complete an action.
@@ -3504,10 +3521,12 @@ export interface CodingContract {
    *
    * @example
    * ```js
-   * const reward = codingcontract.attempt(yourSolution, filename, hostname);
+   * const reward = ns.codingcontract.attempt(yourSolution, filename, hostname);
    * if (reward) {
-   *   ns.tprint(`Contract solved successfully! Reward: ${reward}`)
-   * } else ns.tprint("Failed to solve contract.")
+   *   ns.tprint(`Contract solved successfully! Reward: ${reward}`);
+   * } else {
+   *   ns.tprint("Failed to solve contract.");
+   * }
    * ```
    *
    * @param answer - Attempted solution for the contract.
@@ -3981,6 +4000,27 @@ export interface Gang {
   nextUpdate(): Promise<number>;
 }
 
+/** @public */
+type GoOpponent =
+  | "Netburners"
+  | "Slum Snakes"
+  | "The Black Hand"
+  | "Tetrads"
+  | "Daedalus"
+  | "Illuminati"
+  | "????????????";
+
+/** @public */
+type SimpleOpponentStats = {
+  wins: number;
+  losses: number;
+  winStreak: number;
+  highestWinStreak: number;
+  favor: number;
+  bonusPercent: number;
+  bonusDescription: string;
+};
+
 /**
  * IPvGO api
  * @public
@@ -3993,16 +4033,15 @@ export interface Go {
    * @remarks
    * RAM cost: 4 GB
    *
-   * @returns a promise that contains if your move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+   * @returns a promise that contains the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
    */
   makeMove(
     x: number,
     y: number,
   ): Promise<{
-    type: "invalid" | "move" | "pass" | "gameOver";
-    x: number;
-    y: number;
-    success: boolean;
+    type: "move" | "pass" | "gameOver";
+    x: number | null;
+    y: number | null;
   }>;
 
   /**
@@ -4012,17 +4051,33 @@ export interface Go {
    * This can also be used if you pick up the game in a state where the opponent needs to play next. For example: if BitBurner was
    * closed while waiting for the opponent to make a move, you may need to call passTurn() to get them to play their move on game start.
    *
-   * @returns a promise that contains if your move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+   * @returns a promise that contains the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
    *
    * @remarks
    * RAM cost: 0 GB
    *
    */
   passTurn(): Promise<{
-    type: "invalid" | "move" | "pass" | "gameOver";
-    x: number;
-    y: number;
-    success: boolean;
+    type: "move" | "pass" | "gameOver";
+    x: number | null;
+    y: number | null;
+  }>;
+
+  /**
+   *  Returns a promise that resolves with the success or failure state of your last move, and the AI's response, if applicable.
+   *  x:0 y:0 represents the bottom-left corner of the board in the UI.
+   *
+   * @param logOpponentMove - optional, defaults to true. if false prevents logging opponent move
+   *
+   * @remarks
+   * RAM cost: 0 GB
+   *
+   * @returns a promise that contains if your last move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+   */
+  opponentNextTurn(logOpponentMove?: boolean): Promise<{
+    type: "move" | "pass" | "gameOver";
+    x: number | null;
+    y: number | null;
   }>;
 
   /**
@@ -4030,15 +4085,14 @@ export interface Go {
    * "#" are dead nodes that are not part of the subnet. (They are not territory nor open nodes.)
    *
    * For example, a 5x5 board might look like this:
-```
-   [
-      "XX.O.",
-      "X..OO",
-      ".XO..",
-      "XXO.#",
-      ".XO.#",
+   *
+   [<br/>  
+      "XX.O.",<br/>  
+      "X..OO",<br/>  
+      ".XO..",<br/>  
+      "XXO.#",<br/>  
+      ".XO.#",<br/>  
    ]
-```
    *
    * Each string represents a vertical column on the board, and each character in the string represents a point.
    *
@@ -4054,9 +4108,27 @@ export interface Go {
   getBoardState(): string[];
 
   /**
+   * Returns the color of the current player, or 'None' if the game is over.
+   * @returns "White" | "Black" | "None"
+   */
+  getCurrentPlayer(): "White" | "Black" | "None";
+
+  /**
+   * Gets the status of the current game.
+   * Shows the current player, current score, and the previous move coordinates.
+   * Previous move coordinates will be [-1, -1] for a pass, or if there are no prior moves.
+   */
+  getGameState(): {
+    currentPlayer: "White" | "Black" | "None";
+    whiteScore: number;
+    blackScore: number;
+    previousMove: [number, number] | null;
+  };
+
+  /**
    * Returns the name of the opponent faction in the current subnet.
    */
-  getOpponent(): GoOpponent | "No AI" | "????????????";
+  getOpponent(): GoOpponent | "No AI";
 
   /**
    * Gets new IPvGO subnet with the specified size owned by the listed faction, ready for the player to make a move.
@@ -4065,7 +4137,7 @@ export interface Go {
    *
    * Note that some factions will have a few routers on the subnet at this state.
    *
-   * opponent is "Netburners" or "Slum Snakes" or "The Black Hand" or "Daedalus" or "Illuminati",
+   * opponent is "Netburners" or "Slum Snakes" or "The Black Hand" or "Tetrads" or "Daedalus" or "Illuminati" or "????????????",
    *
    * @returns a simplified version of the board state as an array of strings representing the board columns. See ns.Go.getBoardState() for full details
    *
@@ -4082,11 +4154,9 @@ export interface Go {
      * Shows if each point on the board is a valid move for the player.
      *
      * The true/false validity of each move can be retrieved via the X and Y coordinates of the move.
-```
-     const validMoves = ns.go.analysis.getValidMoves();
-
-     const moveIsValid = validMoves[x][y];
-```
+     *      `const validMoves = ns.go.analysis.getValidMoves();`
+     *
+     *      `const moveIsValid = validMoves[x][y];`
      *
      * Note that the [0][0] point is shown on the bottom-left on the visual board (as is traditional), and each
      * string represents a vertical column on the board. In other words, the printed example above can be understood to
@@ -4106,16 +4176,15 @@ export interface Go {
      *
      * For example, a 5x5 board might look like this. There is a large chain #1 on the left side, smaller chains
      * 2 and 3 on the right, and a large chain 0 taking up the center of the board.
-     *
-```
-      [
-        [   0,0,0,3,4],
-        [   1,0,0,3,3],
-        [   1,1,0,0,0],
-        [null,1,0,2,2],
-        [null,1,0,2,5],
-      ]
-```
+     * <pre lang="javascript">
+     *       [
+     *         [   0,0,0,3,4],
+     *         [   1,0,0,3,3],
+     *         [   1,1,0,0,0],
+     *         [null,1,0,2,2],
+     *         [null,1,0,2,5],
+     *       ]
+     * </pre>
      * @remarks
      * RAM cost: 16 GB
      * (This is intentionally expensive; you can derive this info from just getBoardState() )
@@ -4130,15 +4199,15 @@ export interface Go {
      * For example, a 5x5 board might look like this. The chain in the top-left touches 5 total empty nodes, and the one
      * in the center touches four. The group in the bottom-right only has one liberty; it is in danger of being captured!
      *
-```
-     [
-        [-1, 5,-1,-1, 2],
-        [ 5, 5,-1,-1,-1],
-        [-1,-1, 4,-1,-1],
-        [ 3,-1,-1, 3, 1],
-        [ 3,-1,-1, 3, 1],
-     ]
-```
+     * <pre lang="javascript">
+     *      [
+     *         [-1, 5,-1,-1, 2],
+     *         [ 5, 5,-1,-1,-1],
+     *         [-1,-1, 4,-1,-1],
+     *         [ 3,-1,-1, 3, 1],
+     *         [ 3,-1,-1, 3, 1],
+     *      ]
+     * </pre>
      *
      * @remarks
      * RAM cost: 16 GB
@@ -4154,21 +4223,44 @@ export interface Go {
      * Filled points of any color are indicated with '.'
      *
      * In this example, white encircles some space in the top-left, black encircles some in the top-right, and between their routers is contested space in the center:
-```
-  [
-     "OO..?",
-     "OO.?.",
-     "O.?.X",
-     ".?.XX",
-     "?..X#",
-  ]
-```
+     *
+     * <pre lang="javascript">
+     *   [
+     *      "OO..?",
+     *      "OO.?.",
+     *      "O.?.X",
+     *      ".?.XX",
+     *      "?..X#",
+     *   ]
+     * </pre>
      *
      * @remarks
      * RAM cost: 16 GB
      * (This is intentionally expensive; you can derive this info from just getBoardState() )
      */
     getControlledEmptyNodes(): string[];
+
+    /**
+     * Displays the game history, captured nodes, and gained bonuses for each opponent you have played against.
+     *
+     * The details are keyed by opponent name, in this structure:
+     *
+     * <pre lang="javascript">
+     * {
+     *   <OpponentName>: {
+     *     wins: number,
+     *     losses: number,
+     *     winStreak: number,
+     *     highestWinStreak: number,
+     *     favor: number,
+     *     bonusPercent: number,
+     *     bonusDescription: string,
+     *   }
+     * }
+     * </pre>
+     *
+     */
+    getStats(): Partial<Record<GoOpponent, SimpleOpponentStats>>;
   };
 
   /**
@@ -4177,7 +4269,7 @@ export interface Go {
   cheat: {
     /**
      * Returns your chance of successfully playing one of the special moves in the ns.go.cheat API.
-     * Scales with your crime success rate stat. Caps at 80%.
+     * Scales with your crime success rate stat.
      *
      * Warning: if you fail to play a cheat move, your turn will be skipped. After your first cheat attempt, if you fail, there is a
      * small (~10%) chance you will instantly be ejected from the subnet.
@@ -4199,16 +4291,15 @@ export interface Go {
      * RAM cost: 8 GB
      * Requires Bitnode 14.2 to use
      *
-     * @returns a promise that contains if your move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+     * @returns a promise that contains the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
      */
     removeRouter(
       x: number,
       y: number,
     ): Promise<{
-      type: "invalid" | "move" | "pass" | "gameOver";
-      x: number;
-      y: number;
-      success: boolean;
+      type: "move" | "pass" | "gameOver";
+      x: number | null;
+      y: number | null;
     }>;
     /**
      * Attempts to place two routers at once on empty nodes. Note that this ignores other move restrictions, so you can
@@ -4223,7 +4314,7 @@ export interface Go {
      * RAM cost: 8 GB
      * Requires Bitnode 14.2 to use
      *
-     * @returns a promise that contains if your move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+     * @returns a promise that contains the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
      */
     playTwoMoves(
       x1: number,
@@ -4231,10 +4322,9 @@ export interface Go {
       x2: number,
       y2: number,
     ): Promise<{
-      type: "invalid" | "move" | "pass" | "gameOver";
-      x: number;
-      y: number;
-      success: boolean;
+      type: "move" | "pass" | "gameOver";
+      x: number | null;
+      y: number | null;
     }>;
 
     /**
@@ -4249,16 +4339,15 @@ export interface Go {
      * RAM cost: 8 GB
      * Requires Bitnode 14.2 to use
      *
-     * @returns a promise that contains if your move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+     * @returns a promise that contains the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
      */
     repairOfflineNode(
       x: number,
       y: number,
     ): Promise<{
-      type: "invalid" | "move" | "pass" | "gameOver";
-      x: number;
-      y: number;
-      success: boolean;
+      type: "move" | "pass" | "gameOver";
+      x: number | null;
+      y: number | null;
     }>;
 
     /**
@@ -4274,16 +4363,15 @@ export interface Go {
      * RAM cost: 8 GB
      * Requires Bitnode 14.2 to use
      *
-     * @returns a promise that contains if your move was valid and successful, the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
+     * @returns a promise that contains the opponent move's x and y coordinates (or pass) in response, or an indication if the game has ended
      */
     destroyNode(
       x: number,
       y: number,
     ): Promise<{
-      type: "invalid" | "move" | "pass" | "gameOver";
-      x: number;
-      y: number;
-      success: boolean;
+      type: "move" | "pass" | "gameOver";
+      x: number | null;
+      y: number | null;
     }>;
   };
 }
@@ -4374,13 +4462,13 @@ export interface Sleeve {
    * Return a boolean indicating whether or not this action was set successfully (false if an invalid action is specified).
    *
    * @example
-   * ```ts
+   * ```js
    * // Assigns the first sleeve to Homicide.
    * ns.sleeve.setToCommitCrime(0, "Homicide");
    *
    * // Assigns the second sleeve to Grand Theft Auto, using enum
    * const crimes = ns.enums.CrimeType;
-   * ns.sleeve.setToCommitCrime(1, crimes.grandTheftAuto)
+   * ns.sleeve.setToCommitCrime(1, crimes.grandTheftAuto);
    * ```
    *
    * @param sleeveNumber - Index of the sleeve to start committing crime. Sleeves are numbered starting from 0.
@@ -4449,7 +4537,7 @@ export interface Sleeve {
   setToGymWorkout(sleeveNumber: number, gymName: string, stat: string): boolean;
 
   /**
-   * Make a sleeve travel to another city.
+   * Make a sleeve travel to another city. The cost for using this function is the same as for a player.
    * @remarks
    * RAM cost: 4 GB
    *
@@ -4633,12 +4721,12 @@ interface WorkFormulas {
   /** @returns The WorkStats gained when completing one instance of the specified crime. */
   crimeGains(person: Person, crimeType: CrimeType | `${CrimeType}`): WorkStats;
   /** @returns The WorkStats applied every game cycle (200ms) by taking the specified gym class. */
-  gymGains(person: Person, gymType: GymType | `${GymType}`, locationName: string): WorkStats;
+  gymGains(person: Person, gymType: GymType | `${GymType}`, locationName: LocationName | `${LocationName}`): WorkStats;
   /** @returns The WorkStats applied every game cycle (200ms) by taking the specified university class. */
   universityGains(
     person: Person,
     classType: UniversityClassType | `${UniversityClassType}`,
-    locationName: string,
+    locationName: LocationName | `${LocationName}`,
   ): WorkStats;
   /** @returns The WorkStats applied every game cycle (200ms) by performing the specified faction work. */
   factionGains(person: Person, workType: FactionWorkType | `${FactionWorkType}`, favor: number): WorkStats;
@@ -4711,11 +4799,20 @@ interface HackingFormulas {
    */
   hackPercent(server: Server, player: Person): number;
   /**
-   * Calculate the percent a server would grow to.
-   * Not exact due to limitations of mathematics.
-   * (Ex: 3.0 would grow the server to 300% of its current value.)
+   * Calculate the growth multiplier constant for a given server and threads.
+   *
+   * The actual amount of money grown depends both linearly *and* exponentially on threads;
+   * this is only giving the exponential part that is used for the multiplier.
+   * See {@link NS.grow | grow} for more details.
+   *
+   * As a result of the above, this multiplier does *not* depend on the amount of money on the server.
+   * Changing server.moneyAvailable and server.moneyMax will have no effect.
+   *
+   * For the most common use-cases, you probably want
+   * either {@link HackingFormulas.growThreads | formulas.hacking.growThreads}
+   * or {@link HackingFormulas.growAmount | formulas.hacking.growAmount} instead.
    * @param server - Server info, typically from {@link NS.getServer | getServer}
-   * @param threads - Amount of thread.
+   * @param threads - Amount of threads. Can be fractional.
    * @param player - Player info, typically from {@link NS.getPlayer | getPlayer}
    * @param cores - Number of cores on the computer that will execute grow.
    * @returns The calculated grow percent.
@@ -4723,6 +4820,13 @@ interface HackingFormulas {
   growPercent(server: Server, threads: number, player: Person, cores?: number): number;
   /**
    * Calculate how many threads it will take to grow server to targetMoney. Starting money is server.moneyAvailable.
+   * Note that when simulating the effect of {@link NS.grow | grow}, what matters is the state of the server and player
+   * when the grow *finishes*, not when it is started.
+   *
+   * The growth amount depends both linearly *and* exponentially on threads; see {@link NS.grow | grow} for more details.
+   *
+   * The inverse of this function is {@link HackingFormulas.growAmount | formulas.hacking.growAmount},
+   * although it can work with fractional threads.
    * @param server - Server info, typically from {@link NS.getServer | getServer}
    * @param player - Player info, typically from {@link NS.getPlayer | getPlayer}
    * @param targetMoney - Desired final money, capped to server's moneyMax
@@ -4730,6 +4834,22 @@ interface HackingFormulas {
    * @returns The calculated grow threads as an integer, rounded up.
    */
   growThreads(server: Server, player: Person, targetMoney: number, cores?: number): number;
+  /**
+   * Calculate the amount of money a grow action will leave a server with. Starting money is server.moneyAvailable.
+   * Note that when simulating the effect of {@link NS.grow | grow}, what matters is the state of the server and player
+   * when the grow *finishes*, not when it is started.
+   *
+   * The growth amount depends both linearly *and* exponentially on threads; see {@link NS.grow | grow} for more details.
+   *
+   * The inverse of this function is {@link HackingFormulas.growThreads | formulas.hacking.growThreads},
+   * although it rounds up to integer threads.
+   * @param server - Server info, typically from {@link NS.getServer | getServer}
+   * @param player - Player info, typically from {@link NS.getPlayer | getPlayer}
+   * @param threads - Number of threads to grow with. Can be fractional.
+   * @param cores - Number of cores on the computer that will execute grow.
+   * @returns The amount of money after the calculated grow.
+   */
+  growAmount(server: Server, player: Person, threads: number, cores?: number): number;
   /**
    * Calculate hack time.
    * @param server - Server info, typically from {@link NS.getServer | getServer}
@@ -5099,6 +5219,8 @@ interface InfiltrationLocation {
   location: ILocation;
   reward: InfiltrationReward;
   difficulty: number;
+  maxClearanceLevel: number;
+  startingSecurityLevel: number;
 }
 
 /**
@@ -5121,7 +5243,7 @@ interface Infiltration {
    *
    * @returns Infiltration data for given location.
    */
-  getInfiltration(location: string): InfiltrationLocation;
+  getInfiltration(location: LocationName | `${LocationName}`): InfiltrationLocation;
 }
 
 /**
@@ -5153,7 +5275,7 @@ interface UserInterface {
    * RAM cost: 0 GB
    * @example
    * Usage example (NS2)
-   * ```ts
+   * ```js
    * const theme = ns.ui.getTheme();
    * theme.primary = '#ff5500';
    * ns.ui.setTheme(theme);
@@ -5183,7 +5305,7 @@ interface UserInterface {
    * RAM cost: 0 GB
    * @example
    * Usage example (NS2)
-   * ```ts
+   * ```js
    * const styles = ns.ui.getStyles();
    * styles.fontFamily = 'Comic Sans Ms';
    * ns.ui.setStyles(styles);
@@ -5339,7 +5461,7 @@ export interface NS {
    * }
    * ```
    */
-  readonly args: (string | number | boolean)[];
+  readonly args: ScriptArg[];
 
   /** The current script's PID */
   readonly pid: number;
@@ -5392,7 +5514,11 @@ export interface NS {
    * multiplicative portion of server growth.
    *
    * To determine the effect of a single grow, obtain access to the Formulas API and use
-   * {@link HackingFormulas.growPercent | formulas.hacking.growPercent}, or invert {@link NS.growthAnalyze | growthAnalyze}.
+   * {@link HackingFormulas.growAmount | formulas.hacking.growPercent}, or invert {@link NS.growthAnalyze | growthAnalyze}.
+   *
+   * To determine how many threads are needed to return a server to max money, obtain access to the Formulas API and use
+   * {@link HackingFormulas.growThreads | formulas.hacking.growThreads}, or {@link NS.growthAnalyze} *if* the server will
+   * be at the same security in the future.
    *
    * Like {@link NS.hack | hack}, `grow` can be called on any hackable server, regardless of where the script is
    * running. Hackable servers are any servers not owned by the player.
@@ -5404,7 +5530,7 @@ export interface NS {
    * @example
    * ```js
    * let currentMoney = ns.getServerMoneyAvailable("n00dles");
-   * currentMoney *= await ns.grow("foodnstuff");
+   * currentMoney *= await ns.grow("n00dles");
    * ```
    * @param host - Hostname of the target server to grow.
    * @param opts - Optional parameters for configuring function behavior.
@@ -5461,12 +5587,12 @@ export interface NS {
    *
    *
    * @example
-   * ```ts
+   * ```js
    * // Calculate threadcount of a single hack that would take $100k from n00dles
-   * const hackThreads = hackAnalyzeThreads("n00dles", 1e5);
+   * const hackThreads = ns.hackAnalyzeThreads("n00dles", 1e5);
    *
    * // Launching a script requires an integer thread count. The below would take less than the targeted $100k.
-   * ns.run("noodleHack.js", Math.floor(hackThreads))
+   * ns.run("noodleHack.js", Math.floor(hackThreads));
    *
    * ```
    * @param host - Hostname of the target server to analyze.
@@ -5590,7 +5716,7 @@ export interface NS {
    * @example
    * ```js
    * // This will count from 1 to 10 in your terminal, with one number every 5 seconds
-   * for (var i = 1; i <= 10; i++) {
+   * for (let i = 1; i <= 10; ++i) {
    *   ns.tprint(i);
    *   await ns.sleep(5000);
    * }
@@ -5688,7 +5814,7 @@ export interface NS {
    * ns.printf("My age in binary is %b.", age);
    * ns.printf("My age in scientific notation is %e.", age);
    * ns.printf("In %d seconds, I'll be %s.", 6, "Byte");
-   * ns.printf("Am I a nibble? %t", (4 == age));
+   * ns.printf("Am I a nibble? %t", (4 === age));
    * ns.tail();
    * ```
    *
@@ -5747,6 +5873,8 @@ export interface NS {
    *
    * Logging can be disabled for all functions by passing `ALL` as the argument.
    *
+   * For specific interfaces, use the form "namespace.functionName". (e.g. "ui.setTheme")
+   *
    * @param fn - Name of function for which to disable logging.
    */
   disableLog(fn: string): void;
@@ -5802,7 +5930,7 @@ export interface NS {
    * @param args - Arguments to identify which scripts to get logs for.
    * @returns Returns a string array, where each line is an element in the array. The most recently logged line is at the end of the array.
    */
-  getScriptLogs(fn?: FilenameOrPID, host?: string, ...args: (string | number | boolean)[]): string[];
+  getScriptLogs(fn?: FilenameOrPID, host?: string, ...args: ScriptArg[]): string[];
 
   /**
    * Get an array of recently killed scripts across all servers.
@@ -5814,11 +5942,11 @@ export interface NS {
    * This is configurable in the game's options as `Recently killed scripts size`.
    *
    * @example
-   * ```ts
+   * ```js
    * let recentScripts = ns.getRecentScripts();
-   * let mostRecent = recentScripts.shift()
+   * let mostRecent = recentScripts.shift();
    * if (mostRecent)
-   *   ns.tprint(mostRecent.logs.join('\n'))
+   *   ns.tprint(mostRecent.logs.join('\n'));
    * ```
    *
    * @returns Array with information about previously killed scripts.
@@ -5852,7 +5980,7 @@ export interface NS {
    * @param host - Optional. Hostname of the script being tailed. Defaults to the server this script is running on. If args are specified, this is not optional.
    * @param args - Arguments for the script being tailed.
    */
-  tail(fn?: FilenameOrPID, host?: string, ...args: (string | number | boolean)[]): void;
+  tail(fn?: FilenameOrPID, host?: string, ...args: ScriptArg[]): void;
 
   /**
    * Move a tail window.
@@ -6046,7 +6174,6 @@ export interface NS {
    * ```js
    * ns.sqlinject("foodnstuff");
    * ```
-   * @remarks RAM cost: 0.05 GB
    * @param host - Hostname of the target server.
    */
   sqlinject(host: string): void;
@@ -6080,14 +6207,14 @@ export interface NS {
    * ns.run("foo.js", {threads: 5});
    *
    * //This next example will run ‘foo.js’ single-threaded, and will pass the string ‘foodnstuff’ into the script as an argument:
-   * ns.run("foo.js", 1, 'foodnstuff');
+   * ns.run("foo.js", 1, "foodnstuff");
    * ```
    * @param script - Filename of script to run.
    * @param threadOrOptions - Either an integer number of threads for new script, or a {@link RunOptions} object. Threads defaults to 1.
    * @param args - Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the second argument threadOrOptions must be filled in with a value.
    * @returns Returns the PID of a successfully started script, and 0 otherwise.
    */
-  run(script: string, threadOrOptions?: number | RunOptions, ...args: (string | number | boolean)[]): number;
+  run(script: string, threadOrOptions?: number | RunOptions, ...args: ScriptArg[]): number;
 
   /**
    * Start another script on any server.
@@ -6127,12 +6254,7 @@ export interface NS {
    * @param args - Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the third argument threadOrOptions must be filled in with a value.
    * @returns Returns the PID of a successfully started script, and 0 otherwise.
    */
-  exec(
-    script: string,
-    hostname: string,
-    threadOrOptions?: number | RunOptions,
-    ...args: (string | number | boolean)[]
-  ): number;
+  exec(script: string, hostname: string, threadOrOptions?: number | RunOptions, ...args: ScriptArg[]): number;
 
   /**
    * Terminate current script and start another in a defined number of milliseconds.
@@ -6151,13 +6273,13 @@ export interface NS {
    * @example
    * ```js
    * //The following example will execute the script ‘foo.js’ with 10 threads, in 500 milliseconds and the arguments ‘foodnstuff’ and 90:
-   * ns.spawn('foo.js', {threads: 10, spawnDelay: 500}, 'foodnstuff', 90);
+   * ns.spawn("foo.js", {threads: 10, spawnDelay: 500}, "foodnstuff", 90);
    * ```
    * @param script - Filename of script to execute.
    * @param threadOrOptions - Either an integer number of threads for new script, or a {@link SpawnOptions} object. Threads defaults to 1 and spawnDelay defaults to 10,000 ms.
    * @param args - Additional arguments to pass into the new script that is being run.
    */
-  spawn(script: string, threadOrOptions?: number | SpawnOptions, ...args: (string | number | boolean)[]): void;
+  spawn(script: string, threadOrOptions?: number | SpawnOptions, ...args: ScriptArg[]): void;
   /**
    * Terminate the script with the provided PID.
    * @remarks
@@ -6280,7 +6402,7 @@ export interface NS {
    * @example
    * ```js
    * const ps = ns.ps("home");
-   * for (let script of ps) {
+   * for (const script of ps) {
    *   ns.tprint(`${script.filename} ${script.threads}`);
    *   ns.tprint(script.args);
    * }
@@ -6338,8 +6460,8 @@ export interface NS {
    * @example
    * ```js
    * const mults = ns.getHackingMultipliers();
-   * print(`chance: ${mults.chance}`);
-   * print(`growthL ${mults.growth}`);
+   * ns.tprint(`chance: ${mults.chance}`);
+   * ns.tprint(`growth: ${mults.growth}`);
    * ```
    * @returns Object containing the Player’s hacking related multipliers.
    */
@@ -6554,7 +6676,7 @@ export interface NS {
    * @param args - Arguments to specify/identify the script. Optional, when looking for scripts run without arguments.
    * @returns True if the specified script is running on the target server, and false otherwise.
    */
-  isRunning(script: FilenameOrPID, host?: string, ...args: (string | number | boolean)[]): boolean;
+  isRunning(script: FilenameOrPID, host?: string, ...args: ScriptArg[]): boolean;
 
   /**
    * Get general info about a running script.
@@ -6573,11 +6695,7 @@ export interface NS {
    * @param args  - Arguments to specify/identify the script. Optional, when looking for scripts run without arguments.
    * @returns The info about the running script if found, and null otherwise.
    */
-  getRunningScript(
-    filename?: FilenameOrPID,
-    hostname?: string,
-    ...args: (string | number | boolean)[]
-  ): RunningScript | null;
+  getRunningScript(filename?: FilenameOrPID, hostname?: string, ...args: ScriptArg[]): RunningScript | null;
 
   /**
    * Get cost of purchasing a server.
@@ -6590,7 +6708,7 @@ export interface NS {
    * ```js
    * const ram = 2 ** 20;
    * const cost = ns.getPurchasedServerCost(ram);
-   * ns.tprint(`A purchased server with ${ns.formatRam(ram)} costs ${ns.formatMoney(cost)}`);
+   * ns.tprint(`A purchased server with ${ns.formatRam(ram)} costs $${ns.formatNumber(cost)}`);
    * ```
    * @param ram - Amount of RAM of a potential purchased server, in GB. Must be a power of 2 (2, 4, 8, 16, etc.). Maximum value of 1048576 (2^20).
    * @returns The cost to purchase a server with the specified amount of ram.
@@ -6626,7 +6744,7 @@ export interface NS {
    * // Attempt to purchase 5 servers with 64GB of ram each
    * const ram = 64;
    * const prefix = "pserv-";
-   * for (i = 0; i < 5; ++i) {
+   * for (let i = 0; i < 5; ++i) {
    *    ns.purchaseServer(prefix + i, ram);
    * }
    * ```
@@ -6988,7 +7106,7 @@ export interface NS {
    * @param args - Arguments that the script is running with.
    * @returns Amount of income the specified script generates while online.
    */
-  getScriptIncome(script: string, host: string, ...args: (string | number | boolean)[]): number;
+  getScriptIncome(script: string, host: string, ...args: ScriptArg[]): number;
 
   /**
    * Get the exp gain of all scripts.
@@ -7016,7 +7134,7 @@ export interface NS {
    * @param args - Arguments that the script is running with.
    * @returns Amount of hacking experience the specified script generates while online.
    */
-  getScriptExpGain(script: string, host: string, ...args: (string | number | boolean)[]): number;
+  getScriptExpGain(script: string, host: string, ...args: ScriptArg[]): number;
 
   /**
    * Returns the amount of time in milliseconds that have passed since you last installed Augmentations.
@@ -7135,7 +7253,12 @@ export interface NS {
    * @remarks
    * RAM cost: 0 GB
    *
-   * Prompts the player with a dialog box. Here is an explanation of the various options.
+   * Prompts the player with a dialog box and returns a promise. If the player cancels this dialog box (press X button
+   * or click outside the dialog box), the promise is resolved with a default value (empty string or "false"). If this
+   * API is called again while the old dialog box still exists, the old dialog box will be replaced with a new one, and
+   * the old promise will be resolved with the default value.
+   *
+   * Here is an explanation of the various options.
    *
    * - `options.type` is not provided to the function. If `options.type` is left out and
    *   only a string is passed to the function, then the default behavior is to create a
@@ -7333,7 +7456,7 @@ export interface NS {
    * const resetInfo = ns.getResetInfo();
    * const lastAugReset = resetInfo.lastAugReset;
    * ns.tprint(`The last augmentation reset was: ${new Date(lastAugReset)}`);
-   * ns.tprint(`It has been ${Date.now() - lastAugReset}ms since the last augmentation reset.`);
+   * ns.tprint(`It has been ${Date.now() - lastAugReset} ms since the last augmentation reset.`);
    * ```
    * */
   getResetInfo(): ResetInfo;
@@ -7354,6 +7477,13 @@ export interface NS {
    * RAM cost: 0 GB
    *
    * Allows Unix-like flag parsing.
+   *
+   * We support 2 forms:
+   *
+   * - Short form: the flag contains only 1 character, e.g. -v.
+   *
+   * - Long form: the flag contains more than 1 character, e.g. --version.
+   *
    * @example
    * ```js
    * export async function main(ns) {
@@ -7362,22 +7492,25 @@ export interface NS {
    *     ['server', 'foodnstuff'], //  a default string means this flag is a string
    *     ['exclude', []], // a default array means this flag is a default array of string
    *     ['help', false], // a default boolean means this flag is a boolean
+   *     ['v', false], // short form
    *   ]);
    *   ns.tprint(data);
    * }
    *
-   * // [home ~/]> run example.js
-   * // {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false}
-   * // [home ~/]> run example.js --delay 3000
-   * // {"_":[],"server":"foodnstuff","exclude":[],"help":false,"delay":3000}
-   * // [home ~/]> run example.js --delay 3000 --server harakiri-sushi
-   * // {"_":[],"exclude":[],"help":false,"delay":3000,"server":"harakiri-sushi"}
-   * // [home ~/]> run example.js --delay 3000 --server harakiri-sushi hello world
-   * // {"_":["hello","world"],"exclude":[],"help":false,"delay":3000,"server":"harakiri-sushi"}
-   * // [home ~/]> run example.js --delay 3000 --server harakiri-sushi hello world --exclude a --exclude b
-   * // {"_":["hello","world"],"help":false,"delay":3000,"server":"harakiri-sushi","exclude":["a","b"]}
-   * // [home ~/]> run example.script --help
-   * // {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":true}
+   * // [home /]> run example.js
+   * // {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false,"v":false}
+   * // [home /]> run example.js --delay 3000
+   * // {"_":[],"delay":3000,"server":"foodnstuff","exclude":[],"help":false,"v":false}
+   * // [home /]> run example.js --delay 3000 --server harakiri-sushi
+   * // {"_":[],"delay":3000,"server":"harakiri-sushi","exclude":[],"help":false,"v":false}
+   * // [home /]> run example.js --delay 3000 --server harakiri-sushi hello world
+   * // {"_":["hello","world"],"delay":3000,"server":"harakiri-sushi","exclude":[],"help":false,"v":false}
+   * // [home /]> run example.js --delay 3000 --server harakiri-sushi hello world --exclude a --exclude b
+   * // {"_":["hello","world"],"delay":3000,"server":"harakiri-sushi","exclude":["a","b"],"help":false,"v":false}
+   * // [home /]> run example.js --help
+   * // {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":true,"v":false}
+   * // [home /]> run example.js -v
+   * // {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false,"v":true}
    * ```
    */
   flags(schema: [string, string | number | boolean | string[]][]): { [key: string]: ScriptArg | string[] };
@@ -8142,13 +8275,21 @@ export interface Corporation extends WarehouseAPI, OfficeAPI {
    * ```js
    * while (true) {
    *   const prevState = await ns.corporation.nextUpdate();
-   *   const nextState = ns.corporation.getCorporation().state;
+   *   const nextState = ns.corporation.getCorporation().nextState;
    *   ns.print(`Corporation finished with ${prevState}, next will be ${nextState}.`);
    *   // Manage the Corporation
    * }
    * ```
    */
   nextUpdate(): Promise<CorpStateName>;
+
+  /**
+   * Sell a division
+   * @remarks
+   * RAM cost: 20 GB
+   *
+   * @param divisionName - Name of the division */
+  sellDivision(divisionName: string): void;
 }
 
 /** Product rating information

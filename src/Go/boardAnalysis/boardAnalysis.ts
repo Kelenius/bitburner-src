@@ -1,6 +1,7 @@
 import type { Board, BoardState, Neighbor, PointState, SimpleBoard } from "../Types";
 
 import { GoValidity, GoOpponent, GoColor } from "@enums";
+import { Go } from "../Go";
 import {
   findAdjacentPointsInChain,
   findNeighbors,
@@ -8,8 +9,7 @@ import {
   getBoardCopy,
   getEmptySpaces,
   getNewBoardState,
-  isDefined,
-  isNotNull,
+  isNotNullish,
   updateCaptures,
   updateChains,
 } from "../boardState/boardState";
@@ -44,7 +44,7 @@ export function evaluateIfMoveIsValid(boardState: BoardState, x: number, y: numb
   }
 
   // Detect if the move might be an immediate repeat (only one board of history is saved to check)
-  const possibleRepeat = boardState.previousBoard && getColorOnSimpleBoard(boardState.previousBoard, x, y) === player;
+  const possibleRepeat = boardState.previousBoards.find((board) => getColorOnSimpleBoard(board, x, y) === player);
 
   if (shortcut) {
     // If the current point has some adjacent open spaces, it is not suicide. If the move is not repeated, it is legal
@@ -85,9 +85,11 @@ export function evaluateIfMoveIsValid(boardState: BoardState, x: number, y: numb
   if (evaluationBoard[x]?.[y]?.color !== player) {
     return GoValidity.noSuicide;
   }
-  if (possibleRepeat && boardState.previousBoard) {
+  if (possibleRepeat && boardState.previousBoards.length) {
     const simpleEvalBoard = simpleBoardFromBoard(evaluationBoard);
-    if (areSimpleBoardsIdentical(simpleEvalBoard, boardState.previousBoard)) return GoValidity.boardRepeated;
+    if (boardState.previousBoards.find((board) => areSimpleBoardsIdentical(simpleEvalBoard, board))) {
+      return GoValidity.boardRepeated;
+    }
   }
 
   return GoValidity.valid;
@@ -152,9 +154,7 @@ const resetChainsById = (board: Board, chainIds: string[]) => {
 export function findEffectiveLibertiesOfNewMove(board: Board, x: number, y: number, player: GoColor) {
   const friendlyChains = getAllChains(board).filter((chain) => chain[0].color === player);
   const neighbors = findAdjacentLibertiesAndAlliesForPoint(board, x, y, player);
-  const neighborPoints = [neighbors.north, neighbors.east, neighbors.south, neighbors.west]
-    .filter(isNotNull)
-    .filter(isDefined);
+  const neighborPoints = [neighbors.north, neighbors.east, neighbors.south, neighbors.west].filter(isNotNullish);
   // Get all chains that the new move will connect to
   const allyNeighbors = neighborPoints.filter((neighbor) => neighbor.color === player);
   const allyNeighborChainLiberties = allyNeighbors
@@ -163,7 +163,7 @@ export function findEffectiveLibertiesOfNewMove(board: Board, x: number, y: numb
       return chain?.[0]?.liberties ?? null;
     })
     .flat()
-    .filter(isNotNull);
+    .filter(isNotNullish);
 
   // Get all empty spaces that the new move connects to that aren't already part of friendly liberties
   const directLiberties = neighborPoints.filter((neighbor) => neighbor.color === GoColor.empty);
@@ -185,8 +185,7 @@ export function findEffectiveLibertiesOfNewMove(board: Board, x: number, y: numb
 export function findMaxLibertyCountOfAdjacentChains(boardState: BoardState, x: number, y: number, player: GoColor) {
   const neighbors = findAdjacentLibertiesAndAlliesForPoint(boardState.board, x, y, player);
   const friendlyNeighbors = [neighbors.north, neighbors.east, neighbors.south, neighbors.west]
-    .filter(isNotNull)
-    .filter(isDefined)
+    .filter(isNotNullish)
     .filter((neighbor) => neighbor.color === player);
 
   return friendlyNeighbors.reduce((max, neighbor) => Math.max(max, neighbor?.liberties?.length ?? 0), 0);
@@ -204,8 +203,7 @@ export function findEnemyNeighborChainWithFewestLiberties(board: Board, x: numbe
   const chains = getAllChains(board);
   const neighbors = findAdjacentLibertiesAndAlliesForPoint(board, x, y, player);
   const friendlyNeighbors = [neighbors.north, neighbors.east, neighbors.south, neighbors.west]
-    .filter(isNotNull)
-    .filter(isDefined)
+    .filter(isNotNullish)
     .filter((neighbor) => neighbor.color === player);
 
   const minimumLiberties = friendlyNeighbors.reduce(
@@ -350,10 +348,7 @@ function findNeighboringChainsThatFullyEncircleEmptySpace(
 
     const evaluationBoard = getBoardCopy(board);
     const examplePoint = candidateChain[0];
-    const otherChainNeighborPoints = removePointAtIndex(neighborChainList, index)
-      .flat()
-      .filter(isNotNull)
-      .filter(isDefined);
+    const otherChainNeighborPoints = removePointAtIndex(neighborChainList, index).flat().filter(isNotNullish);
     otherChainNeighborPoints.forEach((point) => {
       const pointToEdit = evaluationBoard[point.x]?.[point.y];
       if (pointToEdit) {
@@ -634,5 +629,29 @@ export function getColorOnSimpleBoard(simpleBoard: SimpleBoard, x: number, y: nu
   if (char === "X") return GoColor.black;
   if (char === "O") return GoColor.white;
   if (char === ".") return GoColor.empty;
+  return null;
+}
+
+/** Find a move made by the previous player, if present. */
+export function getPreviousMove(): [number, number] | null {
+  const priorBoard = Go.currentGame?.previousBoards[0];
+  if (Go.currentGame.passCount || !priorBoard) {
+    return null;
+  }
+
+  for (const rowIndexString in Go.currentGame.board) {
+    const row = Go.currentGame.board[+rowIndexString] ?? [];
+    for (const pointIndexString in row) {
+      const point = row[+pointIndexString];
+      const priorColor = point && priorBoard && getColorOnSimpleBoard(priorBoard, point.x, point.y);
+      const currentColor = point?.color;
+      const isPreviousPlayer = currentColor === Go.currentGame.previousPlayer;
+      const isChanged = priorColor !== currentColor;
+      if (priorColor && currentColor && isPreviousPlayer && isChanged) {
+        return [+rowIndexString, +pointIndexString];
+      }
+    }
+  }
+
   return null;
 }

@@ -182,6 +182,7 @@ const singularity = {
   getCompanyFavor: SF4Cost(RamCostConstants.SingularityFn2 / 3),
   getCompanyFavorGain: SF4Cost(RamCostConstants.SingularityFn2 / 4),
   getFactionInviteRequirements: SF4Cost(RamCostConstants.SingularityFn2),
+  getFactionEnemies: SF4Cost(RamCostConstants.SingularityFn2),
   checkFactionInvitations: SF4Cost(RamCostConstants.SingularityFn2),
   joinFaction: SF4Cost(RamCostConstants.SingularityFn2),
   workForFaction: SF4Cost(RamCostConstants.SingularityFn2),
@@ -254,13 +255,17 @@ const go = {
   makeMove: 4,
   passTurn: 0,
   getBoardState: 4,
+  getCurrentPlayer: 0,
+  getGameState: 0,
   getOpponent: 0,
+  opponentNextTurn: 0,
   resetBoardState: 0,
   analysis: {
     getValidMoves: 8,
     getChains: 16,
     getLiberties: 16,
     getControlledEmptyNodes: 16,
+    getStats: 0,
   },
   cheat: {
     getCheatSuccessChance: 1,
@@ -450,6 +455,7 @@ const corporation = {
   hasResearched: RamCostConstants.CorporationInfo,
   setAutoJobAssignment: RamCostConstants.CorporationAction,
   getOfficeSizeUpgradeCost: RamCostConstants.CorporationInfo,
+  sellDivision: RamCostConstants.CorporationAction,
 } as const;
 
 /** RamCosts guaranteed to match ns structure 1:1 (aside from args and enums).
@@ -617,6 +623,7 @@ export const RamCosts: RamCostTree<NSFull> = {
       hackPercent: 0,
       growPercent: 0,
       growThreads: 0,
+      growAmount: 0,
       hackTime: 0,
       growTime: 0,
       weakenTime: 0,

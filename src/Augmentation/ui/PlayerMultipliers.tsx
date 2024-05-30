@@ -23,14 +23,19 @@ interface IBitNodeModifiedStatsProps {
   color: string;
 }
 
+function customFormatPercent(value: number): string {
+  return formatPercent(value, 2, 100);
+}
+
 function BitNodeModifiedStats(props: IBitNodeModifiedStatsProps): React.ReactElement {
   // If player doesn't have SF5 or if the property isn't affected by BitNode mults
   if (props.mult === 1 || Player.sourceFileLvl(5) === 0)
-    return <Typography color={props.color}>{formatPercent(props.base)}</Typography>;
+    return <Typography color={props.color}>{customFormatPercent(props.base)}</Typography>;
 
   return (
     <Typography color={props.color}>
-      <span style={{ opacity: 0.5 }}>{formatPercent(props.base)}</span> {formatPercent(props.base * props.mult)}
+      <span style={{ opacity: 0.5 }}>{customFormatPercent(props.base)}</span>{" "}
+      {customFormatPercent(props.base * props.mult)}
     </Typography>
   );
 }
@@ -192,28 +197,28 @@ export function PlayerMultipliers(): React.ReactElement {
   ];
   const rightColData: MultiplierListItemData[] = [
     {
-      mult: "Hacknet Node Production",
+      mult: "Hacknet Production",
       current: Player.mults.hacknet_node_money,
       augmented: Player.mults.hacknet_node_money * mults.hacknet_node_money,
       bnMult: currentNodeMults.HacknetNodeMoney,
     },
     {
-      mult: "Hacknet Node Purchase Cost",
+      mult: "Hacknet Purchase Cost",
       current: Player.mults.hacknet_node_purchase_cost,
       augmented: Player.mults.hacknet_node_purchase_cost * mults.hacknet_node_purchase_cost,
     },
     {
-      mult: "Hacknet Node RAM Upgrade Cost",
+      mult: "Hacknet RAM Upgrade Cost",
       current: Player.mults.hacknet_node_ram_cost,
       augmented: Player.mults.hacknet_node_ram_cost * mults.hacknet_node_ram_cost,
     },
     {
-      mult: "Hacknet Node Core Purchase Cost",
+      mult: "Hacknet Core Purchase Cost",
       current: Player.mults.hacknet_node_core_cost,
       augmented: Player.mults.hacknet_node_core_cost * mults.hacknet_node_core_cost,
     },
     {
-      mult: "Hacknet Node Level Upgrade Cost",
+      mult: "Hacknet Level Upgrade Cost",
       current: Player.mults.hacknet_node_level_cost,
       augmented: Player.mults.hacknet_node_level_cost * mults.hacknet_node_level_cost,
     },

@@ -23,10 +23,12 @@ export function getNewBoardState(
 ): BoardState {
   if (ai === GoOpponent.w0r1d_d43m0n) {
     boardToCopy = resetCoordinates(rotate90Degrees(boardFromSimpleBoard(bitverseBoardShape)));
+    boardSize = 19;
+    applyObstacles = false;
   }
 
   const newBoardState: BoardState = {
-    previousBoard: null,
+    previousBoards: [],
     previousPlayer: GoColor.white,
     ai: ai,
     passCount: 0,
@@ -63,7 +65,13 @@ export function getNewBoardState(
 export function getHandicap(boardSize: number, opponent: GoOpponent) {
   // Illuminati and WD get a few starting routers
   if (opponent === GoOpponent.Illuminati || opponent === GoOpponent.w0r1d_d43m0n) {
-    return ceil(boardSize * 0.35);
+    return {
+      [5]: 1,
+      [7]: 3,
+      [9]: 4,
+      [13]: 5,
+      [19]: 7,
+    }[boardSize];
   }
   return 0;
 }
@@ -81,7 +89,12 @@ export function makeMove(boardState: BoardState, x: number, y: number, player: G
     return false;
   }
 
-  boardState.previousBoard = simpleBoardFromBoard(boardState.board);
+  // Only maintain last 7 moves
+  boardState.previousBoards.unshift(simpleBoardFromBoard(boardState.board));
+  if (boardState.previousBoards.length > 7) {
+    boardState.previousBoards.pop();
+  }
+
   const point = boardState.board[x][y];
   if (!point) return false;
 
@@ -118,9 +131,16 @@ export function applyHandicap(board: Board, handicap: number): void {
   const handicapMoveOptions = getExpansionMoveArray(board, availableMoves);
   const handicapMoves: Move[] = [];
 
+  // Special handling for 5x5: extra weight on handicap piece in the center of the board
+  if (availableMoves.length < 26 && board[2][2] && Math.random() < 0.2) {
+    board[2][2].color = GoColor.white;
+    updateChains(board);
+    return;
+  }
+
   // select random distinct moves from the move options list up to the specified handicap amount
   for (let i = 0; i < handicap && i < handicapMoveOptions.length; i++) {
-    const index = floor(Math.random() * handicapMoveOptions.length);
+    const index = Math.floor(Math.random() * handicapMoveOptions.length);
     handicapMoves.push(handicapMoveOptions[index]);
     handicapMoveOptions.splice(index, 1);
   }
@@ -166,12 +186,12 @@ export function updateChains(board: Board, resetChains = true): void {
  * Modifies the board in place.
  */
 export function updateCaptures(board: Board, playerWhoMoved: GoColor, resetChains = true): void {
-  const boardState = updateChains(board, resetChains);
+  updateChains(board, resetChains);
   const chains = getAllChains(board);
 
   const chainsToCapture = findAllCapturedChains(chains, playerWhoMoved);
   if (!chainsToCapture?.length) {
-    return boardState;
+    return;
   }
 
   chainsToCapture?.forEach((chain) => captureChain(chain));
@@ -227,16 +247,13 @@ export function findAdjacentPointsInChain(board: Board, x: number, y: number) {
     checkedPoints.push(currentPoint);
     const neighbors = findNeighbors(board, currentPoint.x, currentPoint.y);
 
-    [neighbors.north, neighbors.east, neighbors.south, neighbors.west]
-      .filter(isNotNull)
-      .filter(isDefined)
-      .forEach((neighbor) => {
-        if (neighbor && neighbor.color === currentPoint.color && !contains(checkedPoints, neighbor)) {
-          adjacentPoints.push(neighbor);
-          pointsToCheckNeighbors.push(neighbor);
-        }
-        checkedPoints.push(neighbor);
-      });
+    [neighbors.north, neighbors.east, neighbors.south, neighbors.west].filter(isNotNullish).forEach((neighbor) => {
+      if (neighbor && neighbor.color === currentPoint.color && !contains(checkedPoints, neighbor)) {
+        adjacentPoints.push(neighbor);
+        pointsToCheckNeighbors.push(neighbor);
+      }
+      checkedPoints.push(neighbor);
+    });
   }
 
   return adjacentPoints;
@@ -265,7 +282,7 @@ export function getEmptySpaces(board: Board): PointState[] {
 export function getStateCopy(initialState: BoardState) {
   const boardState = structuredClone(initialState);
 
-  boardState.previousBoard = initialState.previousBoard ? [...initialState.previousBoard] : null;
+  boardState.previousBoards = initialState.previousBoards ?? [];
   boardState.previousPlayer = initialState.previousPlayer;
   boardState.ai = initialState.ai;
   boardState.passCount = initialState.passCount;
@@ -292,22 +309,9 @@ export function findNeighbors(board: Board, x: number, y: number): Neighbor {
 }
 
 export function getArrayFromNeighbor(neighborObject: Neighbor): PointState[] {
-  return [neighborObject.north, neighborObject.east, neighborObject.south, neighborObject.west]
-    .filter(isNotNull)
-    .filter(isDefined);
+  return [neighborObject.north, neighborObject.east, neighborObject.south, neighborObject.west].filter(isNotNullish);
 }
 
-export function isNotNull<T>(argument: T | null): argument is T {
-  return argument !== null;
-}
-export function isDefined<T>(argument: T | undefined): argument is T {
-  return argument !== undefined;
-}
-
-export function floor(n: number) {
-  return ~~n;
-}
-export function ceil(n: number) {
-  const floored = floor(n);
-  return floored === n ? n : floored + 1;
+export function isNotNullish<T>(argument: T | undefined | null): argument is T {
+  return argument != null;
 }

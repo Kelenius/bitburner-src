@@ -2,17 +2,17 @@ import type { BoardState, OpponentStats, SimpleBoard } from "./Types";
 import type { PartialRecord } from "../Types/Record";
 
 import { Truthy } from "lodash";
-import { GoColor, GoOpponent } from "@enums";
+import { GoColor, GoOpponent, GoPlayType } from "@enums";
 import { Go } from "./Go";
-import { boardStateFromSimpleBoard, simpleBoardFromBoard } from "./boardAnalysis/boardAnalysis";
-import { assertLoadingType } from "../utils/JSONReviver";
+import { boardStateFromSimpleBoard, getPreviousMove, simpleBoardFromBoard } from "./boardAnalysis/boardAnalysis";
+import { assertLoadingType } from "../utils/TypeAssertion";
 import { getEnumHelper } from "../utils/EnumHelper";
 import { boardSizes } from "./Constants";
 import { isInteger, isNumber } from "../types";
+import { makeAIMove } from "./boardAnalysis/goAI";
 
 type PreviousGameSaveData = { ai: GoOpponent; board: SimpleBoard; previousPlayer: GoColor | null } | null;
 type CurrentGameSaveData = PreviousGameSaveData & {
-  previousBoard: SimpleBoard | null;
   cheatCount: number;
   passCount: number;
 };
@@ -35,7 +35,6 @@ export function getGoSave(): SaveFormat {
     currentGame: {
       ai: Go.currentGame.ai,
       board: simpleBoardFromBoard(Go.currentGame.board),
-      previousBoard: Go.currentGame.previousBoard,
       previousPlayer: Go.currentGame.previousPlayer,
       cheatCount: Go.currentGame.cheatCount,
       passCount: Go.currentGame.passCount,
@@ -79,6 +78,18 @@ export function loadGo(data: unknown): boolean {
   Go.currentGame = currentGame;
   Go.previousGame = previousGame;
   Go.stats = stats;
+
+  // If it's the AI's turn, initiate their turn, which will populate nextTurn
+  if (currentGame.previousPlayer === GoColor.black && currentGame.ai !== GoOpponent.none) makeAIMove(currentGame);
+  // If it's not the AI's turn and we're not in gameover status, initialize nextTurn promise based on the previous move/pass
+  else if (currentGame.previousPlayer) {
+    const previousMove = getPreviousMove();
+    Go.nextTurn = Promise.resolve(
+      previousMove
+        ? { type: GoPlayType.move, x: previousMove[0], y: previousMove[1] }
+        : { type: GoPlayType.pass, x: null, y: null },
+    );
+  }
   return true;
 }
 
@@ -94,8 +105,6 @@ function loadCurrentGame(currentGame: unknown): BoardState | string {
   const requiredSize = currentGame.board.length;
   const board = loadSimpleBoard(currentGame.board, requiredSize);
   if (typeof board === "string") return board;
-  const previousBoard = currentGame.previousBoard ? loadSimpleBoard(currentGame.previousBoard, requiredSize) : null;
-  if (typeof previousBoard === "string") return previousBoard;
   const previousPlayer = getEnumHelper("GoColor").getMember(currentGame.previousPlayer) ?? null;
   if (!isInteger(currentGame.cheatCount) || currentGame.cheatCount < 0)
     return "invalid number for currentGame.cheatCount";
@@ -105,7 +114,7 @@ function loadCurrentGame(currentGame: unknown): BoardState | string {
   boardState.previousPlayer = previousPlayer;
   boardState.cheatCount = currentGame.cheatCount;
   boardState.passCount = currentGame.passCount;
-  boardState.previousBoard = previousBoard;
+  boardState.previousBoards = [];
   return boardState;
 }
 

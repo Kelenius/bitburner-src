@@ -379,6 +379,7 @@ function processAllHacknetNodeEarnings(numCycles: number): number {
   for (let i = 0; i < Player.hacknetNodes.length; ++i) {
     const node = Player.hacknetNodes[i];
     if (typeof node === "string") throw new Error("player node should not be ip string");
+    node.updateMoneyGainRate(Player.mults.hacknet_node_money);
     total += processSingleHacknetNodeEarnings(numCycles, node);
   }
 
@@ -569,7 +570,7 @@ export function purchaseHashUpgrade(upgName: string, upgTarget: string, count = 
           console.error(`Invalid target specified in purchaseHashUpgrade(): ${upgTarget}`);
           throw new Error(`'${upgTarget}' is not a company.`);
         }
-        Companies[upgTarget].favor += 5 * count;
+        Companies[upgTarget].setFavor(Companies[upgTarget].favor + 5 * count);
         break;
       }
       default:

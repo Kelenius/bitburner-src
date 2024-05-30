@@ -1,16 +1,16 @@
 import { GetServer, createUniqueRandomIp, ipExists } from "./AllServers";
 import { Server, IConstructorParams } from "./Server";
 import { BaseServer } from "./BaseServer";
-import { calculateServerGrowth, calculateServerGrowthLog } from "./formulas/grow";
+import { calculateGrowMoney, calculateServerGrowthLog } from "./formulas/grow";
 import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
 import { ServerConstants } from "./data/Constants";
 import { Player } from "@player";
 import { CompletedProgramName, LiteratureName } from "@enums";
 import { Person as IPerson } from "@nsdefs";
-import { isValidNumber } from "../utils/helpers/isValidNumber";
 import { Server as IServer } from "@nsdefs";
 import { workerScripts } from "../Netscript/WorkerScripts";
 import { killWorkerScriptByPid } from "../Netscript/killWorkerScript";
+import { serverMetadata } from "./data/servers";
 
 /**
  * Constructs a new server, while also ensuring that the new server
@@ -177,25 +177,8 @@ export function numCycleForGrowthCorrected(
 
 //Applied server growth for a single server. Returns the percentage growth
 export function processSingleServerGrowth(server: Server, threads: number, cores = 1): number {
-  let serverGrowth = calculateServerGrowth(server, threads, Player, cores);
-  if (serverGrowth < 1) {
-    console.warn("serverGrowth calculated to be less than 1");
-    serverGrowth = 1;
-  }
-
   const oldMoneyAvailable = server.moneyAvailable;
-  server.moneyAvailable += threads; // It can be grown even if it has no money
-  server.moneyAvailable *= serverGrowth;
-
-  // in case of data corruption
-  if (isValidNumber(server.moneyMax) && isNaN(server.moneyAvailable)) {
-    server.moneyAvailable = server.moneyMax;
-  }
-
-  // cap at max
-  if (isValidNumber(server.moneyMax) && server.moneyAvailable > server.moneyMax) {
-    server.moneyAvailable = server.moneyMax;
-  }
+  server.moneyAvailable = calculateGrowMoney(server, threads, Player, cores);
 
   // if there was any growth at all, increase security
   if (oldMoneyAvailable !== server.moneyAvailable) {
@@ -252,6 +235,15 @@ export function isBackdoorInstalled(server: BaseServer): boolean {
     return server.backdoorInstalled;
   }
   return false;
+}
+
+export function isBackdoorInstalledInCompanyServer(companyName: string): boolean {
+  const serverMeta = serverMetadata.find((s) => s.specialName === companyName);
+  const server = GetServer(serverMeta ? serverMeta.hostname : "");
+  if (!server) {
+    return false;
+  }
+  return isBackdoorInstalled(server);
 }
 
 export function getCoreBonus(cores = 1): number {

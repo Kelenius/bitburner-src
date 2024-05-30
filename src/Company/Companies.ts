@@ -1,15 +1,19 @@
 // Constructs all CompanyPosition objects using the metadata in data/companypositions.ts
 import { getCompaniesMetadata } from "./data/CompaniesMetadata";
 import { Company } from "./Company";
-import { Reviver, assertLoadingType } from "../utils/JSONReviver";
+import { Reviver } from "../utils/JSONReviver";
+import { assertLoadingType } from "../utils/TypeAssertion";
 import { CompanyName } from "./Enums";
-import { createEnumKeyedRecord } from "../Types/Record";
+import { PartialRecord, createEnumKeyedRecord } from "../Types/Record";
 import { getEnumHelper } from "../utils/EnumHelper";
+import { clampNumber } from "../utils/helpers/clampNumber";
 
 export const Companies: Record<CompanyName, Company> = (() => {
   const metadata = getCompaniesMetadata();
   return createEnumKeyedRecord(CompanyName, (name) => new Company(metadata[name]));
 })();
+
+type SavegameCompany = { favor?: number; playerReputation?: number };
 
 // Used to load Companies map from a save
 export function loadCompanies(saveString: string): void {
@@ -22,9 +26,27 @@ export function loadCompanies(saveString: string): void {
     if (!loadedCompany) continue;
     if (typeof loadedCompany !== "object") continue;
     const company = Companies[loadedCompanyName];
-    assertLoadingType<Company>(loadedCompany);
+    assertLoadingType<SavegameCompany>(loadedCompany);
     const { playerReputation: loadedRep, favor: loadedFavor } = loadedCompany;
-    if (typeof loadedRep === "number" && loadedRep > 0) company.playerReputation = loadedRep;
-    if (typeof loadedFavor === "number" && loadedFavor > 0) company.favor = loadedFavor;
+    if (typeof loadedRep === "number" && loadedRep >= 0) {
+      // `playerReputation` must be in [0, Number.MAX_VALUE].
+      company.playerReputation = clampNumber(loadedRep, 0);
+    }
+    if (typeof loadedFavor === "number" && loadedFavor >= 0) {
+      // `favor` must be in [0, MaxFavor]. This rule will be enforced in the `setFavor` function.
+      company.setFavor(loadedFavor);
+    }
   }
+}
+
+// Most companies are usually at default values, so we'll only save the companies with non-default data
+export function getCompaniesSave(): PartialRecord<CompanyName, SavegameCompany> {
+  const save: PartialRecord<CompanyName, SavegameCompany> = {};
+  for (const companyName of getEnumHelper("CompanyName").valueArray) {
+    const { favor, playerReputation } = Companies[companyName];
+    if (favor || playerReputation) {
+      save[companyName] = { favor: favor || undefined, playerReputation: playerReputation || undefined };
+    }
+  }
+  return save;
 }

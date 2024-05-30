@@ -1,5 +1,5 @@
-import { Player as player } from "../Player";
-import { calculateServerGrowth } from "../Server/formulas/grow";
+import { Player } from "@player";
+import { calculateServerGrowth, calculateGrowMoney } from "../Server/formulas/grow";
 import { numCycleForGrowthCorrected } from "../Server/ServerHelpers";
 import {
   calculateMoneyGainRate,
@@ -62,7 +62,7 @@ import { findCrime } from "../Crime/CrimeHelpers";
 
 export function NetscriptFormulas(): InternalAPI<IFormulas> {
   const checkFormulasAccess = function (ctx: NetscriptContext): void {
-    if (!player.hasProgram(CompletedProgramName.formulas)) {
+    if (!Player.hasProgram(CompletedProgramName.formulas)) {
       throw helpers.errorMessage(ctx, `Requires Formulas.exe to run.`);
     }
   };
@@ -196,6 +196,16 @@ export function NetscriptFormulas(): InternalAPI<IFormulas> {
           checkFormulasAccess(ctx);
           return numCycleForGrowthCorrected(server, targetMoney, startMoney, cores, player);
         },
+      growAmount:
+        (ctx) =>
+        (_server, _player, _threads, _cores = 1) => {
+          const server = helpers.server(ctx, _server);
+          const person = helpers.person(ctx, _player);
+          const threads = helpers.number(ctx, "threads", _threads);
+          const cores = helpers.number(ctx, "cores", _cores);
+          checkFormulasAccess(ctx);
+          return calculateGrowMoney(server, threads, person, cores);
+        },
       hackTime: (ctx) => (_server, _player) => {
         const server = helpers.server(ctx, _server);
         const person = helpers.person(ctx, _player);
@@ -315,7 +325,7 @@ export function NetscriptFormulas(): InternalAPI<IFormulas> {
         const upgName = helpers.string(ctx, "upgName", _upgName);
         const level = helpers.number(ctx, "level", _level);
         checkFormulasAccess(ctx);
-        const upg = player.hashManager.getUpgrade(upgName);
+        const upg = Player.hashManager.getUpgrade(upgName);
         if (!upg) {
           throw helpers.errorMessage(ctx, `Invalid Hash Upgrade: ${upgName}`);
         }
