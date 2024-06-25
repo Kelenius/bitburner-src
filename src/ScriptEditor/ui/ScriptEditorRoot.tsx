@@ -44,7 +44,7 @@ function Root(props: IProps): React.ReactElement {
   const rerender = useRerender();
   const editorRef = useRef<IStandaloneCodeEditor | null>(null);
 
-  const { options, updateRAM, startUpdatingRAM, finishUpdatingRAM } = useScriptEditorContext();
+  const { updateRAM, startUpdatingRAM, finishUpdatingRAM } = useScriptEditorContext();
 
   let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
 
@@ -143,6 +143,7 @@ function Root(props: IProps): React.ReactElement {
     infLoop(newCode);
     updateRAM(
       !currentScript || currentScript.isTxt ? null : newCode,
+      currentScript && currentScript.path,
       currentScript && GetServer(currentScript.hostname),
     );
     finishUpdatingRAM();
@@ -193,6 +194,7 @@ function Root(props: IProps): React.ReactElement {
           props.hostname,
           new monaco.Position(0, 0),
           makeModel(props.hostname, filename, code),
+          props.vim,
         );
         openScripts.push(newScript);
         currentScript = newScript;
@@ -372,9 +374,9 @@ function Root(props: IProps): React.ReactElement {
     }
   }
 
-  const { VimStatus } = useVimEditor({
+  const { statusBarRef } = useVimEditor({
     editor: editorRef.current,
-    vim: options.vim,
+    vim: currentScript !== null ? currentScript.vimMode : props.vim,
     onSave: save,
     onOpenNextTab,
     onOpenPreviousTab,
@@ -410,7 +412,7 @@ function Root(props: IProps): React.ReactElement {
         <div style={{ flex: "0 0 5px" }} />
         <Editor onMount={onMount} onChange={updateCode} onUnmount={onUnmountEditor} />
 
-        {VimStatus}
+        {statusBarRef.current}
 
         <Toolbar onSave={save} editor={editorRef.current} />
       </div>
@@ -422,7 +424,7 @@ function Root(props: IProps): React.ReactElement {
 // Called every time script editor is opened
 export function ScriptEditorRoot(props: IProps) {
   return (
-    <ScriptEditorContextProvider vim={props.vim}>
+    <ScriptEditorContextProvider>
       <Root {...props} />
     </ScriptEditorContextProvider>
   );

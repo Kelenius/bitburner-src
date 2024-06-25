@@ -39,6 +39,8 @@ interface IUpgradeButtonProps {
 
 function UpgradeButton(props: IUpgradeButtonProps): React.ReactElement {
   const gang = useGang();
+  const upgradeCost = gang.getUpgradeCost(props.upg);
+  const isUpgradable = Player.money >= upgradeCost;
   function onClick(): void {
     props.member.buyUpgrade(props.upg);
     props.rerender();
@@ -46,9 +48,13 @@ function UpgradeButton(props: IUpgradeButtonProps): React.ReactElement {
   return (
     <Tooltip title={<Typography dangerouslySetInnerHTML={{ __html: props.upg.desc }} />}>
       <span>
-        <Button onClick={onClick} sx={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>
+        <Button
+          disabled={!isUpgradable}
+          onClick={onClick}
+          sx={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}
+        >
           <Typography sx={{ display: "block" }}>{props.upg.name}</Typography>
-          <Money money={gang.getUpgradeCost(props.upg)} />
+          <Money money={upgradeCost} forPurchase />
         </Button>
       </span>
     </Tooltip>

@@ -44,6 +44,11 @@ import { setupUncaughtPromiseHandler } from "./UncaughtPromiseHandler";
 import { Button, Typography } from "@mui/material";
 import { SnackbarEvents } from "./ui/React/Snackbar";
 import { SaveData } from "./types";
+import { Go } from "./Go/Go";
+
+function showWarningAboutSystemClock() {
+  AlertEvents.emit("Warning: The system clock moved backward.");
+}
 
 /** Game engine. Handles the main game loop. */
 const Engine: {
@@ -143,7 +148,7 @@ const Engine: {
     checkFactionInvitations: 100,
     passiveFactionGrowth: 5,
     messages: 150,
-    mechanicProcess: 5, // Processes certain mechanics (Corporation, Bladeburner)
+    mechanicProcess: 5, // Process Bladeburner
     contractGeneration: 3000, // Generate Coding Contracts
     achievementsCounter: 60, // Check if we have new achievements
   },
@@ -246,7 +251,13 @@ const Engine: {
       // Calculate the number of cycles have elapsed while offline
       Engine._lastUpdate = new Date().getTime();
       const lastUpdate = Player.lastUpdate;
-      const timeOffline = Engine._lastUpdate - lastUpdate;
+      let timeOffline = Engine._lastUpdate - lastUpdate;
+      if (timeOffline < 0) {
+        timeOffline = 0;
+        setTimeout(() => {
+          showWarningAboutSystemClock();
+        }, 250);
+      }
       const numCyclesOffline = Math.floor(timeOffline / CONSTANTS.MilliPerCycle);
 
       // Calculate the number of chances for a contract the player had whilst offline
@@ -330,6 +341,8 @@ const Engine: {
       // Bladeburner offline progress
       if (Player.bladeburner) Player.bladeburner.storeCycles(numCyclesOffline);
 
+      Go.storeCycles(numCyclesOffline);
+
       staneksGift.process(numCyclesOffline);
 
       // Sleeves offline progress
@@ -390,6 +403,12 @@ const Engine: {
     // Get time difference
     const _thisUpdate = new Date().getTime();
     let diff = _thisUpdate - Engine._lastUpdate;
+    if (diff < 0) {
+      diff = 0;
+      Engine._lastUpdate = _thisUpdate;
+      Player.lastUpdate = _thisUpdate;
+      showWarningAboutSystemClock();
+    }
     const offset = diff % CONSTANTS.MilliPerCycle;
 
     // Divide this by cycle time to determine how many cycles have elapsed since last update

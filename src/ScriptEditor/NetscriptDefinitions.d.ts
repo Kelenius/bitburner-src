@@ -2153,6 +2153,18 @@ export interface Singularity {
   workForFaction(faction: string, workType: FactionWorkType | `${FactionWorkType}`, focus?: boolean): boolean;
 
   /**
+   * Get the work types of a faction.
+   * @remarks
+   * RAM cost: 1 GB * 16/4/1
+   *
+   * This function returns an array containing the work types of the specified faction.
+   *
+   * @param faction - Name of the faction.
+   * @returns The work types of the faction.
+   */
+  getFactionWorkTypes(faction: string): FactionWorkType[];
+
+  /**
    * Get faction reputation.
    * @remarks
    * RAM cost: 1 GB * 16/4/1
@@ -3135,7 +3147,7 @@ export interface Bladeburner {
    * @param level - Optional number. Action level at which to calculate the gain. Will be the action's current level if not given.
    * @returns Average Bladeburner reputation gain for successfully completing the specified action.
    */
-  getActionRepGain(type: string, name: string, level: number): number;
+  getActionRepGain(type: string, name: string, level?: number): number;
 
   /**
    * Get action count remaining.
@@ -3324,7 +3336,9 @@ export interface Bladeburner {
    * @remarks
    * RAM cost: 4 GB
    *
-   * Returns the number of Bladeburner team members you have assigned to the specified action.
+   * Returns the number of available Bladeburner team members.
+   * You can also pass the type and name of an action to get the number of
+   * Bladeburner team members you have assigned to the specified action.
    *
    * Setting a team is only applicable for Operations and BlackOps. This function will return 0 for other action types.
    *
@@ -3332,7 +3346,7 @@ export interface Bladeburner {
    * @param name - Name of action. Must be an exact match.
    * @returns Number of Bladeburner team members that were assigned to the specified action.
    */
-  getTeamSize(type: string, name: string): number;
+  getTeamSize(type?: string, name?: string): number;
 
   /**
    * Set team size.
@@ -4108,6 +4122,21 @@ export interface Go {
   getBoardState(): string[];
 
   /**
+   * Returns all the prior moves in the current game, as an array of simple board states.
+   *
+   * For example, a single 5x5 prior move board might look like this:
+   *
+   [<br/>  
+      "XX.O.",<br/>  
+      "X..OO",<br/>  
+      ".XO..",<br/>  
+      "XXO.#",<br/>  
+      ".XO.#",<br/>  
+   ]
+   */
+  getMoveHistory(): string[][];
+
+  /**
    * Returns the color of the current player, or 'None' if the game is over.
    * @returns "White" | "Black" | "None"
    */
@@ -4123,6 +4152,8 @@ export interface Go {
     whiteScore: number;
     blackScore: number;
     previousMove: [number, number] | null;
+    komi: number;
+    bonusCycles: number;
   };
 
   /**
@@ -4137,7 +4168,7 @@ export interface Go {
    *
    * Note that some factions will have a few routers on the subnet at this state.
    *
-   * opponent is "Netburners" or "Slum Snakes" or "The Black Hand" or "Tetrads" or "Daedalus" or "Illuminati" or "????????????",
+   * opponent is "Netburners" or "Slum Snakes" or "The Black Hand" or "Tetrads" or "Daedalus" or "Illuminati" or "????????????" or "No AI",
    *
    * @returns a simplified version of the board state as an array of strings representing the board columns. See ns.Go.getBoardState() for full details
    *
@@ -6930,11 +6961,18 @@ export interface NS {
    * RAM cost: 0 GB
    *
    * Write data to the given Netscript port.
+   *
+   * There is a limit on the maximum number of ports, but you won't reach that limit in normal situations. If you do, it
+   * usually means that there is a bug in your script that leaks port data. A port is freed when it does not have any
+   * data in its underlying queue. `ns.clearPort` deletes all data on a port. `ns.readPort` reads the first element in
+   * the port's queue, then removes it from the queue.
+   *
    * @param portNumber - Port to write to. Must be a positive integer.
    * @param data - Data to write, it's cloned with structuredClone().
    * @returns The data popped off the queue if it was full, or null if it was not full.
    */
   writePort(portNumber: number, data: any): any;
+
   /**
    * Read data from a port.
    * @remarks
@@ -8802,6 +8840,7 @@ interface AutocompleteData {
   servers: string[];
   scripts: string[];
   txts: string[];
+  enums: NSEnums;
   flags(schema: [string, string | number | boolean | string[]][]): { [key: string]: ScriptArg | string[] };
 }
 
