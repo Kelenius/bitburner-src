@@ -355,7 +355,7 @@ export function NetscriptGang(): InternalAPI<IGang> {
 
       return playerPower / (otherPower + playerPower);
     },
-    executeMember: (ctx) => (_memberName) => {
+    retireMember: (ctx) => (_memberName) => {
       const memberName = helpers.string(ctx, "memberName", _memberName);
       const gang = getGang(ctx);
       const member = gang.members.find((x) => x.name === memberName);

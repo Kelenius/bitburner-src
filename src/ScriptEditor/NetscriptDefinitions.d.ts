@@ -3965,7 +3965,7 @@ export interface Gang {
   getChanceToWinClash(gangName: string): number;
 
   /**
-   * Kills a gang member.
+   * Retires a gang member.
    * @remarks
    * RAM cost: 1 GB
    *
@@ -3974,7 +3974,7 @@ export interface Gang {
    * @param memberName - Name of member.
    * @returns True if successful, false otherwise.
    */
-  executeMember(memberName: string): boolean;
+  retireMember(memberName: string): boolean;
 
   /**
    * Get bonus time.
